@@ -1,6 +1,6 @@
 ad_library {
 
-    Additional Widgets for use with the intranet-dynfield
+    Additional OpenACS Widgets for use with the FlexBase
     extensible architecture
 
     @author Frank Bergmann frank.bergmann@project-open.com
