@@ -1253,6 +1253,70 @@ ad_proc -public im_dynfield::search_sql_criteria_from_form {
 
 
 
+
+
+ad_proc -public im_dynfield::create_clone_update_sql {
+    -object_type:required
+    -object_id:required
+} {
+    Returns an SQL update statement that can be executed in
+    the context of an object clone() procedure in order to
+    update dynfields from variables in memory, pulled out
+    of the DB by a statement such as "select p.* from im_projects...".
+} {
+    # Get the main table for the data type
+    db_1row main_table "
+	select
+		table_name as main_table_name,
+		id_column as main_id_column
+	from
+		acs_object_types
+	where
+		object_type = :object_type
+    "
+
+    set attributes_sql "
+	select
+		a.attribute_id,
+		a.table_name as attribute_table_name,
+		a.attribute_name,
+		at.pretty_name,
+		a.datatype,
+		case when a.min_n_values = 0 then 'f' else 't' end as required_p,
+		a.default_value,
+		t.table_name as object_type_table_name,
+		t.id_column as object_type_id_column,
+		at.table_name as attribute_table,
+		at.object_type as attr_object_type
+	from
+		acs_object_type_attributes a,
+		im_dynfield_attributes aa,
+		acs_attributes at,
+		acs_object_types t
+	where
+		a.object_type = :object_type
+		and t.object_type = a.ancestor_type
+		and a.attribute_id = aa.acs_attribute_id
+		and a.attribute_id = at.attribute_id
+	order by
+		attribute_id
+    "
+
+    set sql "update $main_table_name set\n"
+    set komma_required 0
+    db_foreach attributes $attributes_sql {
+	if {$komma_required} { append sql "," }
+	append sql "\t$attribute_name = :$attribute_name\n"
+	set komma_required 1
+    }
+
+    append sql "where $main_id_column = $object_id\n"
+
+    return $sql
+}
+
+
+
 ad_proc -public im_dynfield::set_form_values_from_http {
     -form_id:required
 } {
