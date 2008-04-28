@@ -45,7 +45,7 @@ create table im_dynfield_layout (
 				not null
 				constraint im_dynfield_layout_attribute_fk
 				references im_dynfield_attributes,
-	page_url		varchar(1000) default ''
+	page_url		varchar(1000)
 				constraint im_dynfield_layout_page_nn
 				not null,
 	-- Pos + size is interpreted according to layout type.
@@ -65,6 +65,9 @@ create table im_dynfield_layout (
 	div_class		varchar(400),
 	sort_key		integer
 );
+
+
+
 
 alter table im_dynfield_layout add
   constraint im_dynfield_layout_pk primary key (attribute_id, page_url)
