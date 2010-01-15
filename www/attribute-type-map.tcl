@@ -54,8 +54,7 @@ if {"" != $object_subtype_id && 0 != $object_subtype_id} {
 set top_scale [db_list top_dim "
 	select	category_id
 	from	im_categories
-	where	category_type = :category_type and
-		(enabled_p is null or enabled_p = 't')
+	where	category_type = :category_type
 		$object_subtype_sql
 	order by
 		category_id
