@@ -47,14 +47,6 @@ ad_proc -public template::widget::generic_tcl { element_reference tag_attributes
 	set switch_p 0
     }
     
-    # Deal with global variables being pushed through
-    set global_var_pos [lsearch $params global_var]
-    if {$global_var_pos >= 0} {
-	set global_var_name [lindex $params [expr $global_var_pos +1]]
-	set $global_var_name [set ::$global_var_name]
-    }
-    
-    
     # The "memoize_max_age" adds an empty line
     set memoize_max_age [parameter::get_from_package_key -package_key intranet-dynfield -parameter GenericSQLWidgetMemoizeMaxAgeDefault -default 600]
     set memoize_max_age_pos [lsearch $params "memoize_max_age"]
@@ -63,19 +55,11 @@ ad_proc -public template::widget::generic_tcl { element_reference tag_attributes
     }
     
     
-    set switch_pos [lsearch $params switch_p]
-    if {$switch_pos >= 0} {
-	set switch_p [lindex $params [expr $switch_pos +1]]
-    } else {
-	set switch_p 0
-    }
-    
     # Deal with global variables being pushed through
     set global_var_pos [lsearch $params global_var]
     if {$global_var_pos >= 0} {
 	set global_var_name [lindex $params [expr $global_var_pos +1]]
 	set $global_var_name [set ::$global_var_name]
-	ds_comment "$global_var_name [set $global_var_name]"
     }
     
     set memoize_pos [lsearch $params memoize_p]
@@ -113,24 +97,23 @@ ad_proc -public template::widget::generic_tcl { element_reference tag_attributes
     
     set key_value_list [list]
     if {[string first "$" $tcl_code] >= 0} {
-	eval "set tcl_code \"$tcl_code\""
-	ds_comment "$tcl_code"
+        eval "set tcl_code \"$tcl_code\""
     }
     
     if {$memoize_p} {
-	if {[catch {
-	    set key_value_list [util_memoize [list eval $tcl_code] $memoize_max_age]
-	} errmsg]} {
-	    return "Generic tcl Widget: Error executing tcl statment <pre>'$tcl_code'</pre>: <br>
+        if {[catch {
+            set key_value_list [util_memoize [list eval $tcl_code] $memoize_max_age]
+        } errmsg]} {
+            return "Generic tcl Widget: Error executing tcl statment <pre>'$tcl_code'</pre>: <br>
                     <pre>$errmsg</pre>"
-	}
+        }
     } else {
-	if {[catch {
-	    set key_value_list [eval $tcl_code]
-	} errmsg]} {
-	    return "Generic tcl Widget: Error executing tcl statment <pre>'$tcl_code'</pre>: <br>
+        if {[catch {
+            set key_value_list [eval $tcl_code]
+        } errmsg]} {
+            return "Generic tcl Widget: Error executing tcl statment <pre>'$tcl_code'</pre>: <br>
                     <pre>$errmsg</pre>"
-	}
+        }
     }
     set tcl_html ""
     set default_value ""

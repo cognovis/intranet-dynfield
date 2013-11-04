@@ -173,10 +173,11 @@ set sql "
 	order by
 		aa.sort_order, aa.pretty_name
 "
+
+    
 db_foreach attribute_table_map $sql {
     set key "$attribute_id.$object_type_id"
     set hash($key) $display_mode
-    ns_log Notice "attribute-type-map: hash($key) <= $display_mode"
 }
 
 

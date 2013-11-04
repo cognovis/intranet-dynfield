@@ -1,6 +1,7 @@
 ad_page_contract {
 
     @author Matthew Geddert openacs@geddert.com
+    @author Malte Sussdorff (malte.sussdorff@cognovis.de)
     @creation-date 2004-07-28
     @cvs-id $Id$
 } {
@@ -66,7 +67,7 @@ if {[exists_and_not_null attribute_id]} {
     "
 
 	if {![db_0or1row attribute_texts "
-		select section_heading, help_text from im_dynfield_type_attribute_map where attribute_id = :attribute_id limit 1
+		select section_heading, help_text,default_value from im_dynfield_type_attribute_map where attribute_id = :attribute_id limit 1
 	"]} {
 		set section_heading ""
 		set help_text ""
@@ -75,7 +76,6 @@ if {[exists_and_not_null attribute_id]} {
 } else {
     set element_mode "edit"
 }
-
 
 if {"" eq $label_style} { set label_style "plain" }
 
@@ -311,6 +311,15 @@ lappend form_fields {
 }
 
 lappend form_fields {
+	default_value:text,optional 
+	{label {Default Value}} 
+	{html {size 60 maxlength 200}}
+	{help_text "
+		Default Value for this attribute. If you start the default value with 'tcl' and put a command in {} behind it, the tcl code will be executed and the return value taken as the default value. To get the current user_id for example use 'tcl {ad_conn user_id}'
+	"}
+}
+
+lappend form_fields {
 	section_heading:text,optional 
 	{label {Section Heading}} 
 	{html {size 30 maxlength 100}}
@@ -393,6 +402,7 @@ ad_form \
 			  -label_style $label_style \
 			  -pos_y $pos_y \
 			  -help_text $help_text \
+			  -default_value $default_value \
 			  -section_heading $section_heading \
 			 ]
     
@@ -461,13 +471,31 @@ ad_form \
     "
 
 	
-    db_dml update_texts "
+    # Find out if the attribute is in the type map
+    set attribute_exists_p [db_string attribute_exists "select 1 from im_dynfield_type_attribute_map where attribute_id = :attribute_id limit 1" -default 0]
+    if {$attribute_exists_p} {
+	db_dml update_texts "
         update im_dynfield_type_attribute_map set
             help_text = :help_text,
+            default_value = :default_value,
             section_heading = :section_heading,
-			required_p = :required_p
+	    required_p = :required_p
         where attribute_id = :attribute_id
     "
+    } else {
+	set category_ids [db_list category_types "
+              select category_id 
+              from im_categories, acs_object_types
+              where object_type = :object_type
+              and category_type = type_category_type"]
+	foreach category_id $category_ids {
+	    db_dml insert "insert into im_dynfield_type_attribute_map (
+                               attribute_id, object_type_id, display_mode, help_text, default_value, section_heading, required_p
+                           ) values (
+                               :attribute_id, :category_id, 'edit', :help_text, :default_value, :section_heading, :required_p
+                           )"
+	}
+    }
 } -after_submit {
 
 
@@ -506,7 +534,6 @@ ad_form \
     
     ad_script_abort
 }
-
 
 
 # ------------------------------------------------------------------
