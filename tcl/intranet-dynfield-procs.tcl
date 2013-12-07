@@ -1496,10 +1496,21 @@ ad_proc -public im_dynfield::append_attribute_to_form {
 
     append after_html $admin_html
 
+
+    # Deal with global variables being pushed through
+    set global_var_pos [lsearch $default_value global_var]
+    if {$global_var_pos >= 0} {
+	set global_var_name [lindex $default_value [expr $global_var_pos +1]]
+	set $global_var_name [set ::$global_var_name]
+    }
+
     # Check if we need to parse the default_value
     set tcl_pos [lsearch $default_value "tcl"]
-    if {$tcl_pos == 0} {
-        set tcl_code [lindex $default_value 1]
+    
+    # Deal with global variables being pushed through
+    set tcl_pos [lsearch $default_value tcl]
+    if {$tcl_pos >= 0} {
+	set tcl_code [lindex $default_value [expr $tcl_pos +1]]
         set default_value [eval $tcl_code]
     }
 
