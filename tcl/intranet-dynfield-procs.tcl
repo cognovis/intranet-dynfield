@@ -290,12 +290,11 @@ ad_proc -public im_dynfield::search_sql_criteria_from_form {
 		dw.widget
 	from
 		acs_object_type_attributes a,
-                acs_object_type_tables ott,
 		im_dynfield_attributes aa,
 		im_dynfield_widgets dw,
 		acs_attributes at,
 		acs_object_types t,
-		acs_object_type_tables ott
+                acs_object_type_tables ott
 	where
 		a.object_type = :object_type
                 and a.object_type = ott.object_type
