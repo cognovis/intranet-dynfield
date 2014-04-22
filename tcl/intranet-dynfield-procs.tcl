@@ -1276,12 +1276,13 @@ ad_proc -public im_dynfield::append_attributes_to_form {
             set help_message ""
         }
 
+        # Default Values
         if {[info exists default_value($dynfield_attribute_id)]} {
             set default_message $default_value($dynfield_attribute_id)
         } else {
             set default_message ""
         }
-        
+                
         # set the value
         upvar $attribute_name x
         
@@ -1297,9 +1298,11 @@ ad_proc -public im_dynfield::append_attributes_to_form {
             -help_text $help_message \
             -default_value $default_message \
             -admin_html $admin_html
-                if { 0 != $field_cnt } {
+        
+        if { 0 != $field_cnt } {
             append ajax_post_data_build " + "
         }
+        
         if { "date" == $widget } {
             append ajax_post_data_build "\"<$attribute_name>\""
             append ajax_post_data_build " + evalReturnValue('date', "
@@ -1382,13 +1385,13 @@ ad_proc -public im_dynfield::append_attributes_to_form {
 
                 # Don't overwrite values with default value if the value is there already
                 if {$value ne ""} {
-		    switch $widget {
-			date {
-			    set date [template::util::date::create]
-			    set value [template::util::date::set_property ansi $date $value]
-			}
-			default { }
-		    }
+		            switch $widget {
+                        date {
+                            set date [template::util::date::create]
+                            set value [template::util::date::set_property ansi $date $value]
+                        }
+                        default { }
+                    }
 		    
                     if {$debug} { ns_log Debug "im_dynfield::append_attributes_to_form: default storage: name=$attribute_name, value=$value" }
                     template::element::set_value $form_id $attribute_name $value
@@ -1516,6 +1519,7 @@ ad_proc -public im_dynfield::append_attribute_to_form {
 	set tcl_code [lindex $default_value [expr $tcl_pos +1]]
         set default_value [eval $tcl_code]
     }
+
 
     switch $widget {
         checkbox - radio - select - multiselect - im_category_tree - category_tree {
