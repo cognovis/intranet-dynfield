@@ -1210,6 +1210,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
 	if {$advanced_filter_p} {
 	    # In filter mode the user also needs to be able to "write"
 	    # the field, otherwise he won't be able to enter values...
+	    if {$read_p} {set write_p 1}
 #	    if {!$write_p} { continue }
 #	    if {!$write_p} { set read_p 1 }
 	}
