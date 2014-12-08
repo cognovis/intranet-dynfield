@@ -1204,9 +1204,17 @@ ad_proc -public im_dynfield::append_attributes_to_form {
 			-user_id $user_id \
 			-privilege "write" \
 	]
-	if {!$read_p} { continue }
+	if {!$read_p} { 
+        if {$advanced_filter_p} {
+            set widget "hidden"
+        } else {
+        	   continue 
+        }
+    	} else {
+        	set display_mode $default_display_mode	
+    	}
+    	
 
-	set display_mode $default_display_mode
 	if {$advanced_filter_p} {
 	    # In filter mode the user also needs to be able to "write"
 	    # the field, otherwise he won't be able to enter values...
