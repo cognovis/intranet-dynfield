@@ -1517,8 +1517,12 @@ ad_proc -public im_dynfield::append_attribute_to_form {
     # Deal with global variables being pushed through
     set global_var_pos [lsearch $default_value global_var]
     if {$global_var_pos >= 0} {
-	set global_var_name [lindex $default_value [expr $global_var_pos +1]]
-	set $global_var_name [set ::$global_var_name]
+	set global_var_names [lindex $default_value [expr $global_var_pos +1]]
+	foreach global_var_name $global_var_names {
+	    # The global var is usually called from the procedure call 
+	    # add_attributes_to_form
+	    upvar 2 $global_var_name $global_var_name
+	}
     }
 
     # Check if we need to parse the default_value
