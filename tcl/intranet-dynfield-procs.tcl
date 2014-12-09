@@ -1205,13 +1205,14 @@ ad_proc -public im_dynfield::append_attributes_to_form {
 			-privilege "write" \
 	]
 	if {!$read_p} { 
-        if {$advanced_filter_p} {
-            set widget "hidden"
-        } else {
-        	   continue 
-        }
+	    if {$advanced_filter_p} {
+		set widget "hidden"
+		set display_mode "display"
+	    } else {
+        	continue 
+	    }
     	} else {
-        	set display_mode $default_display_mode	
+           set display_mode $default_display_mode	
     	}
     	
 
