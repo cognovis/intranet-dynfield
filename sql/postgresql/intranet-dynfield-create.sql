@@ -3,7 +3,6 @@
 --
 -- @author Matthew Geddert openacs@geddert.com
 -- @author Frank Bergmann frank.bergmann@project-open.com
--- @author Malte Sussdorff (malte.sussdorff@cognovis.de)
 -- @author Juanjo Ruiz juanjoruizx@yahoo.es
 -- @author Malte Sussdorff (malte.sussdorff@cognovis.de)
 -- @creation-date 2005-01-04
@@ -57,37 +56,6 @@ SELECT im_category_new(22110, 'Freelance Managers', 'Intranet User Type');
 
 
 
-create table im_dynfield_type_attribute_map (
-	attribute_id		integer
-				constraint im_dynfield_type_attr_map_attr_fk
-				references im_dynfield_attributes(attribute_id) on delete cascade,
-	object_type_id		integer
-				constraint im_dynfield_type_attr_map_otype_nn
-				not null
-				constraint im_dynfield_type_attr_map_otype_fk
-				references im_categories,
-	display_mode		varchar(10)
-				constraint im_dynfield_type_attr_map_dmode_nn
-				not null
-				constraint im_dynfield_type_attr_map_dmode_ck
-				check (display_mode in ('edit', 'display', 'none')),
-	help_text		text,
-	unique (attribute_id, object_type_id)
-);
-
-comment on table im_dynfield_type_attribute_map is 'This table defines under which conditions an attribute is to be rendered. The condition is determined by the object_type_id, which is a category_id. This category_id is of the category_type which is defined as ''type_category_type'' for the object_type of the attribute. The object_type ''im_projects'' has a type_category_type in acs_object_types of ''Intranet Project Type'' which is the category_type (in im_categories) that contains all the category_ids which can be used to define conditions in the way of object_type_id.';
-comment on column im_dynfield_type_attribute_map.attribute_id is 'This is the dynfield_id from im_dynfield_attributes which identifies the attribute. It is NOT an attribute_id from acs_attributes.';
-comment on column im_dynfield_type_attribute_map.object_type_id is 'This is the conditions identifier. This identifier is object specific, so if we take Projects as an example again, the condition is defined by the object''s type_id. In the case of Projects, this is stored in im_projects.project_type_id (see acs_object_types.type_column for more). When an object (e.g. Project) is displayed, the system takes the project_type_id and looks up in type_attribute_map how the attributes for the object_type ''im_project'' are to be treated.';
-comment on column im_dynfield_type_attribute_map.display_mode is 'The display mode defining the mode in which the attribute is to be displayed. ''edit'' means, it can be both displayed (attribute & value) and edited in a form. ''display'' means that it will displayed when showing the object, but it will not be included in a form. ''none'' means it will neither show up when displaying the object nor when editing a form for this object. This is in addition to the individual permissions you can give on the dynfield_id, so if Freelancers don''t have permission to view attribute, then it does not matter what the display_mode says, they won''t see it';
-comment on column im_dynfield_type_attribute_map.help_text is 'This is the help_text for this attribute. Though usually it is the same for all object_type_ids (and this is how it is saved with im_dynfield::attribute::add) it is possible to make it differ depending on the TYPE (category_id) of the object';
-comment on column im_dynfield_type_attribute_map.section_heading is 'This allows the grouping of attributes under a common heading. See ad_form sections for more details.';
-comment on column im_dynfield_type_attribute_map.default_value is 'This is the default value for this attribute. Though usually it is the same for all object_type_ids (and this is how it is saved with im_dynfield::attribute::add) it is possible to make it differ depending on the TYPE (category_id) of the object';
-comment on column im_dynfield_type_attribute_map.required_p is 'This marks, if the attribute is a required attribute in this condition. This is useful e.g. in Projects where depending on the project_type you want an attribute to be filled out, but for other project types it is not necessary.';
-
-
-
-
-
 -- ------------------------------------------------------------------
 -- AMS Compatibility
 -- ------------------------------------------------------------------
@@ -108,35 +76,6 @@ from
 where 
 	aot.type_category_type is not null 
 	and aot.type_category_type = c.category_type;
-
--- AMS Compatibility view
-create or replace view ams_list_attribute_map as
-select
-	tam.object_type_id as list_id,
-	da.acs_attribute_id as attribute_id,
-	0::integer as sort_order,
-	false::boolean as required_p,
-	''::varchar as section_heading,
-	''::varchar as html_options
-from
-	im_dynfield_type_attribute_map tam,
-	im_dynfield_attributes da
-where
-	tam.attribute_id = da.attribute_id;
-
-
-CREATE OR REPLACE VIEW ams_attributes as
-	select	aa.*,
-		da.attribute_id as dynfield_attribute_id,
-		da.acs_attribute_id,
-		da.widget_name as widget,
-		da.already_existed_p,
-		da.deprecated_p
-	from
-		acs_attributes aa
-		LEFT JOIN im_dynfield_attributes da ON (aa.attribute_id = da.acs_attribute_id)
-;
-
 
 
 -- ------------------------------------------------------------------
@@ -263,7 +202,17 @@ comment on column im_dynfield_attributes.attribute_id is 'This column should be 
 comment on column im_dynfield_attributes.acs_attribute_id is 'This references the attribute_id from acs_attributes. It is used to connect an acs_attribute with the display_logic';
 
 
-
+CREATE OR REPLACE VIEW ams_attributes as
+	select	aa.*,
+		da.attribute_id as dynfield_attribute_id,
+		da.acs_attribute_id,
+		da.widget_name as widget,
+		da.already_existed_p,
+		da.deprecated_p
+	from
+		acs_attributes aa
+		LEFT JOIN im_dynfield_attributes da ON (aa.attribute_id = da.acs_attribute_id)
+;
 
 
 -- Make acs_attribute unique, so that no two dynfield_attributes can reference the same acs_attrib.
@@ -271,11 +220,12 @@ alter table im_dynfield_attributes add constraint
 im_dynfield_attributes_acs_attribute_un UNIQUE (acs_attribute_id);
 
 
+
 create table im_dynfield_type_attribute_map (
 	attribute_id		integer
 				constraint im_dynfield_type_attr_map_attr_fk
-				references acs_objects,
-	object_type_id		integer 
+				references im_dynfield_attributes(attribute_id) on delete cascade,
+	object_type_id		integer
 				constraint im_dynfield_type_attr_map_otype_nn
 				not null
 				constraint im_dynfield_type_attr_map_otype_fk
@@ -285,18 +235,64 @@ create table im_dynfield_type_attribute_map (
 				not null
 				constraint im_dynfield_type_attr_map_dmode_ck
 				check (display_mode in ('edit', 'display', 'none')),
+	help_text		text,
+	section_heading		text,
+	default_value 		text,
+	required_p		char(1) default 'f',
 	unique (attribute_id, object_type_id)
 );
 
-comment on table im_dynfield_type_attribute_map is '
-This map allows us to specify whether a DynField attribute should
-appear in a Edit/NewPage of an object, and whether it should appear
-in edit or display mode.
-The table maps the objects type_id (such as project_type_id, company_type_id
-etc.) to the "display_mode" for the DynField attribute.
-The display mode is "edit" if there is no entry in this map table.
-';
+comment on table im_dynfield_type_attribute_map is 'This table defines under which conditions an attribute is to be rendered. The condition is determined by the object_type_id, which is a category_id. This category_id is of the category_type which is defined as ''type_category_type'' for the object_type of the attribute. The object_type ''im_projects'' has a type_category_type in acs_object_types of ''Intranet Project Type'' which is the category_type (in im_categories) that contains all the category_ids which can be used to define conditions in the way of object_type_id.';
+comment on column im_dynfield_type_attribute_map.attribute_id is 'This is the dynfield_id from im_dynfield_attributes which identifies the attribute. It is NOT an attribute_id from acs_attributes.';
+comment on column im_dynfield_type_attribute_map.object_type_id is 'This is the conditions identifier. This identifier is object specific, so if we take Projects as an example again, the condition is defined by the object''s type_id. In the case of Projects, this is stored in im_projects.project_type_id (see acs_object_types.type_column for more). When an object (e.g. Project) is displayed, the system takes the project_type_id and looks up in type_attribute_map how the attributes for the object_type ''im_project'' are to be treated.';
+comment on column im_dynfield_type_attribute_map.display_mode is 'The display mode defining the mode in which the attribute is to be displayed. ''edit'' means, it can be both displayed (attribute & value) and edited in a form. ''display'' means that it will displayed when showing the object, but it will not be included in a form. ''none'' means it will neither show up when displaying the object nor when editing a form for this object. This is in addition to the individual permissions you can give on the dynfield_id, so if Freelancers don''t have permission to view attribute, then it does not matter what the display_mode says, they won''t see it';
+comment on column im_dynfield_type_attribute_map.help_text is 'This is the help_text for this attribute. Though usually it is the same for all object_type_ids (and this is how it is saved with im_dynfield::attribute::add) it is possible to make it differ depending on the TYPE (category_id) of the object';
+comment on column im_dynfield_type_attribute_map.section_heading is 'This allows the grouping of attributes under a common heading. See ad_form sections for more details.';
+comment on column im_dynfield_type_attribute_map.default_value is 'This is the default value for this attribute. Though usually it is the same for all object_type_ids (and this is how it is saved with im_dynfield::attribute::add) it is possible to make it differ depending on the TYPE (category_id) of the object';
+comment on column im_dynfield_type_attribute_map.required_p is 'This marks, if the attribute is a required attribute in this condition. This is useful e.g. in Projects where depending on the project_type you want an attribute to be filled out, but for other project types it is not necessary.';
 
+
+
+-- create table im_dynfield_type_attribute_map (
+-- 	attribute_id		integer
+-- 				constraint im_dynfield_type_attr_map_attr_fk
+-- 				references acs_objects,
+-- 	object_type_id		integer 
+-- 				constraint im_dynfield_type_attr_map_otype_nn
+-- 				not null
+-- 				constraint im_dynfield_type_attr_map_otype_fk
+-- 				references im_categories,
+-- 	display_mode		varchar(10)
+-- 				constraint im_dynfield_type_attr_map_dmode_nn
+-- 				not null
+-- 				constraint im_dynfield_type_attr_map_dmode_ck
+-- 				check (display_mode in ('edit', 'display', 'none')),
+-- 	unique (attribute_id, object_type_id)
+-- );
+-- 
+-- comment on table im_dynfield_type_attribute_map is '
+-- This map allows us to specify whether a DynField attribute should
+-- appear in a Edit/NewPage of an object, and whether it should appear
+-- in edit or display mode.
+-- The table maps the objects type_id (such as project_type_id, company_type_id
+-- etc.) to the "display_mode" for the DynField attribute.
+-- The display mode is "edit" if there is no entry in this map table.
+-- ';
+
+-- AMS Compatibility view
+create or replace view ams_list_attribute_map as
+select
+	tam.object_type_id as list_id,
+	da.acs_attribute_id as attribute_id,
+	0::integer as sort_order,
+	false::boolean as required_p,
+	''::varchar as section_heading,
+	''::varchar as html_options
+from
+	im_dynfield_type_attribute_map tam,
+	im_dynfield_attributes da
+where
+	tam.attribute_id = da.attribute_id;
 
 -- ------------------------------------------------------------------
 -- dynfield_attr_multi_value
@@ -449,7 +445,7 @@ select acs_object_type__create_type (
 	'acs_object',			-- supertype
 	'im_dynfield_pages',		-- table_name
 	'page_id',			-- id_column
-	'intranet-dynfield',		-- package_name
+	'im_dynfield_page',		-- package_name
 	'f',				-- abstract_p
 	null,				-- type_extension_table
 	'im_dynfield_page__name'	-- name_method
@@ -481,9 +477,9 @@ create table im_dynfield_pages (
 	workflow_key		varchar(100)
 				constraint im_dynfield_pages_workflow_key_fk
 				references wf_workflows,
-	transition_key		varchar(100)
-				constraint im_dynfield_pages_transition_key_fk
-				references wf_transitions,
+	transition_key		varchar(100),
+
+	foreign key (workflow_key, transition_key) references wf_transitions,
 
 	layout_type		varchar(15)
 				constraint im_dynfield_layout_type_nn
@@ -513,7 +509,7 @@ select acs_object_type__create_type (
 	'acs_object',				-- supertype
 	'im_dynfield_page_attributes',		-- table_name
 	'attribute_id',				-- id_column
-	'intranet-dynfield',			-- package_name
+	'im_dynfield_page_attribute',		-- package_name
 	'f',					-- abstract_p
 	null,					-- type_extension_table
 	'im_dynfield_page_attribute__name'	-- name_method
@@ -572,12 +568,20 @@ create table im_dynfield_page_fields (
 -- Make sure there are acs_object_type_table entries for all objects
 -- ------------------------------------------------------------------
 
-create or replace function im_insert_acs_object_type_tables (varchar, varchar, varchar) 
-returns integer as $body$
+
+
+-- added
+select define_function_args('im_insert_acs_object_type_tables','object_type,table_name,id_column');
+
+--
+-- procedure im_insert_acs_object_type_tables/3
+--
+CREATE OR REPLACE FUNCTION im_insert_acs_object_type_tables(
+   p_object_type varchar,
+   p_table_name varchar,
+   p_id_column varchar
+) RETURNS integer AS $$
 DECLARE
-	p_object_type		alias for $1;
-	p_table_name		alias for $2;
-	p_id_column		alias for $3;
 
 	v_count			integer;
 BEGIN
@@ -598,7 +602,8 @@ BEGIN
 	values (p_object_type, p_table_name, p_id_column);
 
 	return 0;
-end;$body$ language 'plpgsql';
+END;
+$$ language 'plpgsql';
 
 
 SELECT im_insert_acs_object_type_tables('acs_activity','acs_activities','activity_id');
@@ -687,35 +692,42 @@ SELECT im_insert_acs_object_type_tables('relationship','acs_rels','rel_id');
 
 -- Setup the "Dynfield" main menu entry
 
-create or replace function inline_0 ()
-returns integer as '
-declare
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS integer AS $$
+DECLARE
 	v_menu			integer;
 	v_admin_menu		integer;
 	v_admins		integer;
 BEGIN
-	select group_id into v_admins from groups where group_name = ''P/O Admins'';
-	select menu_id into v_admin_menu from im_menus where label=''admin'';
+	select group_id into v_admins from groups where group_name = 'P/O Admins';
+	select menu_id into v_admin_menu from im_menus where label='admin';
 
 	v_menu := im_menu__new (
 		null,			-- p_menu_id
-		''im_menu'',		-- object_type
+		'im_menu',		-- object_type
 		now(),			-- creation_date
 		null,			-- creation_user
 		null,			-- creation_ip
 		null,			-- context_id
-		''intranet-dynfield'',	-- package_name
-		''dynfield_admin'',	-- label
-		''DynField'',		-- name
-		''/intranet-dynfield/'',-- url
+		'intranet-dynfield',	-- package_name
+		'dynfield_admin',	-- label
+		'DynField',		-- name
+		'/intranet-dynfield/',-- url
 		750,			-- sort_order
 		v_admin_menu,		-- parent_menu_id
 		null			-- p_visible_tcl
 	);
 
-	PERFORM acs_permission__grant_permission(v_menu, v_admins, ''read'');
+	PERFORM acs_permission__grant_permission(v_menu, v_admins, 'read');
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 select inline_0 ();
 drop function inline_0 ();
 
@@ -849,22 +861,6 @@ SELECT im_menu__new (
 	'Conf Item',						-- name
 	'/intranet-dynfield/object-type?object_type=im_conf_item', -- url
 	112,							-- sort_order
-	(select menu_id from im_menus where label = 'dynfield_otype'),	-- parent_menu_id
-	null							-- p_visible_tcl
-);
-
-SELECT im_menu__new (
-	null,							-- p_menu_id
-	'im_menu',						-- object_type
-	now(),							-- creation_date
-	null,							-- creation_user
-	null,							-- creation_ip
-	null,							-- context_id
-	'intranet-dynfield',					-- package_name
-	'dynfield_otype_events',				-- label
-	'Event',						-- name
-	'/intranet-dynfield/object-type?object_type=im_event',	-- url
-	118,							-- sort_order
 	(select menu_id from im_menus where label = 'dynfield_otype'),	-- parent_menu_id
 	null							-- p_visible_tcl
 );
@@ -1108,27 +1104,31 @@ update im_menus set name = 'Ticket' where name = 'Tickets' and package_name = 'i
 -- Setup DynField Widgets Data
 ---------------------------------------------------------
 
-create or replace function im_dynfield_widget__new (
-	integer, varchar, timestamptz, integer, varchar, integer,
-	varchar, varchar, varchar, integer, varchar, varchar, 
-	varchar, varchar
-) returns integer as '
-DECLARE
-	p_widget_id		alias for $1;
-	p_object_type		alias for $2;
-	p_creation_date 	alias for $3;
-	p_creation_user 	alias for $4;
-	p_creation_ip		alias for $5;
-	p_context_id		alias for $6;
 
-	p_widget_name		alias for $7;
-	p_pretty_name		alias for $8;
-	p_pretty_plural		alias for $9;
-	p_storage_type_id	alias for $10;
-	p_acs_datatype		alias for $11;
-	p_widget		alias for $12;
-	p_sql_datatype		alias for $13;
-	p_parameters		alias for $14;
+
+-- added
+
+--
+-- procedure im_dynfield_widget__new/14
+--
+CREATE OR REPLACE FUNCTION im_dynfield_widget__new(
+   p_widget_id integer,
+   p_object_type varchar,
+   p_creation_date timestamptz,
+   p_creation_user integer,
+   p_creation_ip varchar,
+   p_context_id integer,
+   p_widget_name varchar,
+   p_pretty_name varchar,
+   p_pretty_plural varchar,
+   p_storage_type_id integer,
+   p_acs_datatype varchar,
+   p_widget varchar,
+   p_sql_datatype varchar,
+   p_parameters varchar
+) RETURNS integer AS $$
+DECLARE
+
 
 	v_widget_id		integer;
 BEGIN
@@ -1153,33 +1153,39 @@ BEGIN
 		p_storage_type_id, p_acs_datatype, p_widget, p_sql_datatype, p_parameters
 	);
 	return v_widget_id;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
 
 
-create or replace function im_dynfield_widget__new (
-	integer, varchar, timestamptz, integer, varchar, integer,
-	varchar, varchar, varchar, integer, varchar, varchar,
-	varchar, varchar, varchar
-) returns integer as '
+
+
+-- added
+select define_function_args('im_dynfield_widget__new','widget_id,object_type,creation_date,creation_user,creation_ip,context_id,widget_name,pretty_name,pretty_plural,storage_type_id,acs_datatype,widget,sql_datatype,parameters,deref_plpgsql_function');
+
+--
+-- procedure im_dynfield_widget__new/15
+--
+CREATE OR REPLACE FUNCTION im_dynfield_widget__new(
+   p_widget_id integer,
+   p_object_type varchar,
+   p_creation_date timestamptz,
+   p_creation_user integer,
+   p_creation_ip varchar,
+   p_context_id integer,
+   p_widget_name varchar,
+   p_pretty_name varchar,
+   p_pretty_plural varchar,
+   p_storage_type_id integer,
+   p_acs_datatype varchar,
+   p_widget varchar,
+   p_sql_datatype varchar,
+   p_parameters varchar,
+   p_deref_plpgsql_function varchar
+) RETURNS integer AS $$
 DECLARE
-	p_widget_id			alias for $1;
-	p_object_type			alias for $2;
-	p_creation_date			alias for $3;
-	p_creation_user			alias for $4;
-	p_creation_ip			alias for $5;
-	p_context_id			alias for $6;
 
-	p_widget_name			alias for $7;
-	p_pretty_name			alias for $8;
-	p_pretty_plural			alias for $9;
-	p_storage_type_id		alias for $10;
-	p_acs_datatype			alias for $11;
-	p_widget			alias for $12;
-	p_sql_datatype			alias for $13;
-	p_parameters			alias for $14;
-	p_deref_plpgsql_function	alias for $15;
 
 	v_widget_id			integer;
 BEGIN
@@ -1204,14 +1210,24 @@ BEGIN
 		p_storage_type_id, p_acs_datatype, p_widget, p_sql_datatype, p_parameters, p_deref_plpgsql_function
 	);
 	return v_widget_id;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
 
 
-create or replace function im_dynfield_widget__delete (integer) returns integer as '
+
+
+-- added
+select define_function_args('im_dynfield_widget__delete','widget_id');
+
+--
+-- procedure im_dynfield_widget__delete/1
+--
+CREATE OR REPLACE FUNCTION im_dynfield_widget__delete(
+   p_widget_id integer
+) RETURNS integer AS $$
 DECLARE
-	p_widget_id		alias for $1;
 BEGIN
 	-- Erase the im_dynfield_widgets item associated with the id
 	delete from im_dynfield_widgets
@@ -1223,12 +1239,22 @@ BEGIN
 
 	PERFORM acs_object__delete(v_widget_id);
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
-create or replace function im_dynfield_widget__name (integer) returns varchar as '
+
+
+-- added
+select define_function_args('im_dynfield_widget__name','widget_id');
+
+--
+-- procedure im_dynfield_widget__name/1
+--
+CREATE OR REPLACE FUNCTION im_dynfield_widget__name(
+   p_widget_id integer
+) RETURNS varchar AS $$
 DECLARE
-	p_widget_id		alias for $1;
 	v_name			varchar;
 BEGIN
 	select	widget_name
@@ -1237,7 +1263,8 @@ BEGIN
 	where	widget_id = p_widget_id;
 
 	return v_name;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
 -- ------------------------------------------------------------------
@@ -1245,22 +1272,27 @@ end;' language 'plpgsql';
 -- ------------------------------------------------------------------
 
 
-create or replace function im_dynfield_attribute__new (
-	integer, varchar, timestamptz, integer, varchar, integer,
-	integer, varchar, char(1), char(1)
-) returns integer as '
-DECLARE
-	p_attribute_id		alias for $1;
-	p_object_type		alias for $2;
-	p_creation_date 	alias for $3;
-	p_creation_user 	alias for $4;
-	p_creation_ip		alias for $5;
-	p_context_id		alias for $6;
 
-	p_acs_attribute_id	alias for $7;
-	p_widget_name		alias for $8;
-	p_deprecated_p		alias for $9;
-	p_already_existed_p	alias for $10;
+
+-- added
+
+--
+-- procedure im_dynfield_attribute__new/10
+--
+CREATE OR REPLACE FUNCTION im_dynfield_attribute__new(
+   p_attribute_id integer,
+   p_object_type varchar,
+   p_creation_date timestamptz,
+   p_creation_user integer,
+   p_creation_ip varchar,
+   p_context_id integer,
+   p_acs_attribute_id integer,
+   p_widget_name varchar,
+   p_deprecated_p char(1),
+   p_already_existed_p char(1)
+) RETURNS integer AS $$
+DECLARE
+
 
 	v_attribute_id		integer;
 BEGIN
@@ -1281,32 +1313,92 @@ BEGIN
 		p_deprecated_p, p_already_existed_p
 	);
 	return v_attribute_id;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
 
-create or replace function im_dynfield_attribute__new (
-	integer, varchar, timestamptz, integer, varchar, integer,
-	integer, varchar, char(1), char(1), integer, varchar, char(1), char(1)
-) returns integer as '
+-- added
+select define_function_args('im_dynfield_widget__new','widget_id,object_type,creation_date,creation_user,creation_ip,context_id,widget_name,pretty_name,pretty_plural,storage_type_id,acs_datatype,widget,sql_datatype,parameters,deref_plpgsql_function');
+
+--
+-- procedure im_dynfield_widget__new/15
+--
+CREATE OR REPLACE FUNCTION im_dynfield_widget__new(
+   p_widget_id integer,
+   p_object_type varchar,
+   p_creation_date timestamptz,
+   p_creation_user integer,
+   p_creation_ip varchar,
+   p_context_id integer,
+   p_widget_name varchar,
+   p_pretty_name varchar,
+   p_pretty_plural varchar,
+   p_storage_type_id integer,
+   p_acs_datatype varchar,
+   p_widget varchar,
+   p_sql_datatype varchar,
+   p_parameters varchar,
+   p_deref_plpgsql_function varchar
+) RETURNS integer AS $$
 DECLARE
-	p_attribute_id		alias for $1;
-	p_object_type		alias for $2;
-	p_creation_date		alias for $3;
-	p_creation_user		alias for $4;
-	p_creation_ip		alias for $5;
-	p_context_id		alias for $6;
 
-	p_acs_attribute_id	alias for $7;
-	p_widget_name		alias for $8;
-	p_deprecated_p		alias for $9;
-	p_already_existed_p	alias for $10;
-	p_pos_y			alias for $11;
-	p_label_style		alias for $12;
-	p_also_hard_coded_p	alias for $13;
-	p_include_in_search_p	alias for $14;
 
-	v_attribute_id		integer;
+	v_widget_id		integer;
+BEGIN
+	select widget_id into v_widget_id from im_dynfield_widgets
+	where widget_name = p_widget_name;
+	if v_widget_id is not null then return v_widget_id; end if;
+
+	v_widget_id := acs_object__new (
+		p_widget_id,
+		p_object_type,
+		p_creation_date,
+		p_creation_user,
+		p_creation_ip,
+		p_context_id
+	);
+
+	insert into im_dynfield_widgets (
+		widget_id, widget_name, pretty_name, pretty_plural,
+		storage_type_id, acs_datatype, widget, sql_datatype, parameters, deref_plpgsql_function
+	) values (
+		v_widget_id, p_widget_name, p_pretty_name, p_pretty_plural,
+		p_storage_type_id, p_acs_datatype, p_widget, p_sql_datatype, p_parameters, p_deref_plpgsql_function
+	);
+	return v_widget_id;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+-- added
+
+--
+-- procedure im_dynfield_attribute__new/14
+--
+CREATE OR REPLACE FUNCTION im_dynfield_attribute__new(
+   p_attribute_id integer,
+   p_object_type varchar,
+   p_creation_date timestamptz,
+   p_creation_user integer,
+   p_creation_ip varchar,
+   p_context_id integer,
+   p_acs_attribute_id integer,
+   p_widget_name varchar,
+   p_deprecated_p char(1),
+   p_already_existed_p char(1),
+   p_pos_y integer,
+   p_label_style varchar,
+   p_also_hard_coded_p char(1),
+   p_include_in_search_p char(1)
+) RETURNS integer AS $$
+DECLARE
+	v_count			integer;
+        v_attribute_id          integer;
+	v_type_category 	varchar;
+
+	row			RECORD;
 BEGIN
 	v_attribute_id := acs_object__new (
 		p_attribute_id,
@@ -1318,17 +1410,17 @@ BEGIN
 	);
 
 	insert into im_dynfield_attributes (
-		attribute_id, acs_attribute_id, widget_name, also_hard_coded_p
+		attribute_id, acs_attribute_id, widget_name, also_hard_coded_p,
 		deprecated_p, already_existed_p, include_in_search_p
 	) values (
-		v_attribute_id, p_acs_attribute_id, p_widget_name, p_also_hard_coded_p
+		v_attribute_id, p_acs_attribute_id, p_widget_name, p_also_hard_coded_p,
 		p_deprecated_p, p_already_existed_p, p_include_in_search_p
 	);
 
 	insert into im_dynfield_layout (
-		attribute_id, page_url, pos_y, label_style
+		attribute_id, page_url, object_type, pos_y, label_style
 	) values (
-		v_attribute_id, ''default'', p_pos_y, p_label_style
+		v_attribute_id, 'default', p_object_type, p_pos_y, p_label_style
 	);
 
 
@@ -1336,63 +1428,61 @@ BEGIN
 	select type_category_type into v_type_category from acs_object_types
 	where object_type = p_object_type;
 	FOR row IN
-		select	category_id
+		select  category_id
 		from	im_categories
 		where	category_type = v_type_category
 	LOOP
-		select	count(*) into v_count from im_dynfield_type_attribute_map
+		select  count(*) into v_count from im_dynfield_type_attribute_map
 		where	object_type_id = row.category_id and attribute_id = v_attribute_id;
 		IF 0 = v_count THEN
-			insert into im_dynfield_type_attribute_map (
-				attribute_id, object_type_id, display_mode
-			) values (
-				v_attribute_id, row.category_id, ''edit''
-			);
+				insert into im_dynfield_type_attribute_map (
+					attribute_id, object_type_id, display_mode
+				) values (
+					v_attribute_id, row.category_id, 'edit'
+				);
 		END IF;
 	END LOOP;
 
-	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name=''Employees''), ''read'');
-	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name=''Employees''), ''write'');
-	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name=''Customers''), ''read'');
-	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name=''Customers''), ''write'');
-	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name=''Freelancers''), ''read'');
-	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name=''Freelancers''), ''write'');
+	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name='Employees'), 'read');
+	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name='Employees'), 'write');
+	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name='Customers'), 'read');
+	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name='Customers'), 'write');
+	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name='Freelancers'), 'read');
+	PERFORM acs_permission__grant_permission(v_attribute_id, (select group_id from groups where group_name='Freelancers'), 'write');
 
 	return v_attribute_id;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
 
+-- added
+select define_function_args('im_dynfield_attribute__new','attribute_id,object_type,creation_date,creation_user,creation_ip,context_id,attribute_object_type,attribute_name,min_n_values,max_n_values,default_value,datatype,pretty_name,pretty_plural,widget_name,deprecated_p,already_existed_p,table_name');
 
-
-
-create or replace function im_dynfield_attribute__new (
-	integer, varchar, timestamptz, integer, varchar, integer,
-	varchar, varchar, integer, integer, varchar, 
-	varchar, varchar, varchar, varchar, char, char, varchar
-) returns integer as '
+--
+-- procedure im_dynfield_attribute__new/18
+--
+CREATE OR REPLACE FUNCTION im_dynfield_attribute__new(
+   p_attribute_id integer,
+   p_object_type varchar,
+   p_creation_date timestamptz,
+   p_creation_user integer,
+   p_creation_ip varchar,
+   p_context_id integer,
+   p_attribute_object_type varchar,
+   p_attribute_name varchar,
+   p_min_n_values integer,
+   p_max_n_values integer,
+   p_default_value varchar,
+   p_datatype varchar,
+   p_pretty_name varchar,
+   p_pretty_plural varchar,
+   p_widget_name varchar,
+   p_deprecated_p char,
+   p_already_existed_p char,
+   p_table_name varchar
+) RETURNS integer AS $$
 DECLARE
-	p_attribute_id		alias for $1;
-	p_object_type		alias for $2;
-	p_creation_date 	alias for $3;
-	p_creation_user 	alias for $4;
-	p_creation_ip		alias for $5;
-	p_context_id		alias for $6;
-
-	p_attribute_object_type	alias for $7;
-	p_attribute_name	alias for $8;
-	p_min_n_values		alias for $9;
-	p_max_n_values		alias for $10;
-	p_default_value		alias for $11;
-
-	p_datatype		alias for $12;
-	p_pretty_name		alias for $13;
-	p_pretty_plural		alias for $14;
-	p_widget_name		alias for $15;
-	p_deprecated_p		alias for $16;
-	p_already_existed_p	alias for $17;
-	p_table_name		alias for $18;
-
 	v_acs_attribute_id	integer;
 	v_attribute_id		integer;
 BEGIN
@@ -1421,8 +1511,8 @@ BEGIN
 			p_min_n_values,
 			p_max_n_values,
 			null,			-- sort order
-			''type_specific'',	-- storage
-			''f''			-- static_p
+			'type_specific',	-- storage
+			'f'			-- static_p
 		);
 	END IF;
 
@@ -1447,7 +1537,7 @@ BEGIN
 	insert into im_dynfield_type_attribute_map (attribute_id, object_type_id, display_mode)
 	select	ida.attribute_id,
 		c.category_id,
-		''edit''
+		'edit'
 	from	im_dynfield_attributes ida,
 		acs_attributes aa,
 		acs_object_types aot,
@@ -1459,36 +1549,39 @@ BEGIN
 		aa.attribute_name = p_attribute_name;
 
 	return v_attribute_id;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
 
 -- Same as before with the object main table as default
-create or replace function im_dynfield_attribute__new (
-	integer, varchar, timestamptz, integer, varchar, integer,
-	varchar, varchar, integer, integer, varchar, 
-	varchar, varchar, varchar, varchar, char, char
-) returns integer as '
+
+
+--
+-- procedure im_dynfield_attribute__new/17
+--
+CREATE OR REPLACE FUNCTION im_dynfield_attribute__new(
+   p_attribute_id integer,
+   p_object_type varchar,
+   p_creation_date timestamptz,
+   p_creation_user integer,
+   p_creation_ip varchar,
+   p_context_id integer,
+   p_attribute_object_type varchar,
+   p_attribute_name varchar,
+   p_min_n_values integer,
+   p_max_n_values integer,
+   p_default_value varchar,
+   p_datatype varchar,
+   p_pretty_name varchar,
+   p_pretty_plural varchar,
+   p_widget_name varchar,
+   p_deprecated_p char,
+   p_already_existed_p char
+) RETURNS integer AS $$
 DECLARE
-	p_attribute_id		alias for $1;
-	p_object_type		alias for $2;
-	p_creation_date 	alias for $3;
-	p_creation_user 	alias for $4;
-	p_creation_ip		alias for $5;
-	p_context_id		alias for $6;
 
-	p_attribute_object_type	alias for $7;
-	p_attribute_name	alias for $8;
-	p_min_n_values		alias for $9;
-	p_max_n_values		alias for $10;
-	p_default_value		alias for $11;
 
-	p_datatype		alias for $12;
-	p_pretty_name		alias for $13;
-	p_pretty_plural		alias for $14;
-	p_widget_name		alias for $15;
-	p_deprecated_p		alias for $16;
-	p_already_existed_p	alias for $17;
 
 	v_table_name		varchar;
 BEGIN
@@ -1501,14 +1594,24 @@ BEGIN
 		p_datatype, p_pretty_name, p_pretty_plural, p_widget_name, p_deprecated_p, p_already_existed_p, v_table_name
 	);
 
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
 
 
-create or replace function im_dynfield_attribute__delete (integer) returns integer as '
+
+
+-- added
+select define_function_args('im_dynfield_attribute__delete','attribute_id');
+
+--
+-- procedure im_dynfield_attribute__delete/1
+--
+CREATE OR REPLACE FUNCTION im_dynfield_attribute__delete(
+   p_attribute_id integer
+) RETURNS integer AS $$
 DECLARE
-	p_attribute_id		alias for $1;
 BEGIN
 	-- Erase the mapping of im_dynfield_attributes to object sub-types
 	delete from im_dynfield_type_attribute_map
@@ -1527,26 +1630,33 @@ BEGIN
 
 	PERFORM acs_object__delete(p_attribute_id);
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
 
 
 -- Shortcut function
-CREATE OR REPLACE FUNCTION im_dynfield_attribute_new (
-	varchar, varchar, varchar, varchar, varchar, char(1), integer, char(1), varchar
-) RETURNS integer as '
-DECLARE
-	p_object_type		alias for $1;
-	p_column_name		alias for $2;
-	p_pretty_name		alias for $3;
-	p_widget_name		alias for $4;
-	p_datatype		alias for $5;
-	p_required_p		alias for $6;
-	p_pos_y			alias for $7;
-	p_also_hard_coded_p	alias for $8;
-	p_table_name		alias for $9;
 
+
+-- added
+select define_function_args('im_dynfield_attribute_new','object_type,column_name,pretty_name,widget_name,datatype,required_p,pos_y,also_hard_coded_p,table_name');
+
+--
+-- procedure im_dynfield_attribute_new/9
+--
+CREATE OR REPLACE FUNCTION im_dynfield_attribute_new(
+   p_object_type varchar,
+   p_column_name varchar,
+   p_pretty_name varchar,
+   p_widget_name varchar,
+   p_datatype varchar,
+   p_required_p char(1),
+   p_pos_y integer,
+   p_also_hard_coded_p char(1),
+   p_table_name varchar
+) RETURNS integer AS $$
+DECLARE
 	v_dynfield_id		integer;
 	v_widget_id		integer;
 	v_type_category		varchar;
@@ -1569,13 +1679,13 @@ BEGIN
 	IF v_count > 0 THEN return 1; END IF;
 
 	v_min_n_value := 0;
-	IF p_required_p = ''t'' THEN v_min_n_value := 1; END IF;
+	IF p_required_p = 't' THEN v_min_n_value := 1; END IF;
 
 	v_dynfield_id := im_dynfield_attribute__new (
-		null, ''im_dynfield_attribute'', now(), 0, ''0.0.0.0'', null,
+		null, 'im_dynfield_attribute', now(), 0, '0.0.0.0', null,
 		p_object_type, p_column_name, v_min_n_value, 1, null,
 		p_datatype, p_pretty_name, p_pretty_name, p_widget_name,
-		''f'', ''f'', p_table_name
+		'f', 'f', p_table_name
 	);
 
 	update im_dynfield_attributes set also_hard_coded_p = p_also_hard_coded_p
@@ -1586,13 +1696,13 @@ BEGIN
 	-- Insert a layout entry into the default page
 	select	count(*) into v_count
 	from	im_dynfield_layout
-	where	attribute_id = v_dynfield_id and page_url = ''default'';
+	where	attribute_id = v_dynfield_id and page_url = 'default';
 
 	IF 0 = v_count THEN
 		insert into im_dynfield_layout (
-			attribute_id, page_url, pos_y, label_style
+			attribute_id, page_url, object_type, pos_y, label_style
 		) values (
-			v_dynfield_id, ''default'', p_pos_y, ''plain''
+			v_dynfield_id, 'default', p_object_type, p_pos_y, 'plain'
 		);
 	END IF;
 
@@ -1611,59 +1721,78 @@ BEGIN
 			insert into im_dynfield_type_attribute_map (
 				attribute_id, object_type_id, display_mode
 			) values (
-				v_dynfield_id, row.category_id, ''edit''
+				v_dynfield_id, row.category_id, 'edit'
 			);
 		END IF;
 	END LOOP;
 
-	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name=''Employees''), ''read'');
-	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name=''Employees''), ''write'');
-	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name=''Customers''), ''read'');
-	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name=''Customers''), ''write'');
-	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name=''Freelancers''), ''read'');
-	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name=''Freelancers''), ''write'');
+	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name='Employees'), 'read');
+	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name='Employees'), 'write');
+	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name='Customers'), 'read');
+	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name='Customers'), 'write');
+	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name='Freelancers'), 'read');
+	PERFORM acs_permission__grant_permission(v_dynfield_id, (select group_id from groups where group_name='Freelancers'), 'write');
 
 	RETURN v_dynfield_id;
-END;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 -- Shortcut function
-CREATE OR REPLACE FUNCTION im_dynfield_attribute_new (
-	varchar, varchar, varchar, varchar, varchar, char(1), integer, char(1)
-) RETURNS integer as '
-DECLARE
-	p_object_type		alias for $1;
-	p_column_name		alias for $2;
-	p_pretty_name		alias for $3;
-	p_widget_name		alias for $4;
-	p_datatype		alias for $5;
-	p_required_p		alias for $6;
-	p_pos_y			alias for $7;
-	p_also_hard_coded_p	alias for $8;
 
+
+--
+-- procedure im_dynfield_attribute_new/8
+--
+CREATE OR REPLACE FUNCTION im_dynfield_attribute_new(
+   p_object_type varchar,
+   p_column_name varchar,
+   p_pretty_name varchar,
+   p_widget_name varchar,
+   p_datatype varchar,
+   p_required_p char(1),
+   p_pos_y integer,
+   p_also_hard_coded_p char(1)
+) RETURNS integer AS $$
+DECLARE
 	v_table_name		varchar;
 BEGIN
 	select table_name into v_table_name
 	from acs_object_types where object_type = p_object_type;
 
-	RETURN im_dynfield_attribute_new($1,$2,$3,$4,$5,$6,null,$8,v_table_name);
-END;' language 'plpgsql';
+	RETURN im_dynfield_attribute_new(p_object_type,p_column_name,p_pretty_name,p_widget_name,p_datatype,p_required_p,p_pos_y,p_also_hard_coded_p,v_table_name);
+END;
+$$ LANGUAGE plpgsql;
 
+
+--
+-- procedure im_dynfield_attribute_new/6
+--
 
 -- Shortcut function
 CREATE OR REPLACE FUNCTION im_dynfield_attribute_new (
 	varchar, varchar, varchar, varchar, varchar, char(1)
-) RETURNS integer as '
+) RETURNS integer AS $$
 BEGIN
-	RETURN im_dynfield_attribute_new($1,$2,$3,$4,$5,$6,null,''f'');
-END;' language 'plpgsql';
+	RETURN im_dynfield_attribute_new($1,$2,$3,$4,$5,$6,null,'f');
+END;
+$$ LANGUAGE plpgsql;
 
 
 
 
 -- Delete a single attribute (if we know its ID...)
-create or replace function im_dynfield_attribute__del (integer) returns integer as '
+
+
+-- added
+select define_function_args('im_dynfield_attribute__del','attribute_id');
+
+--
+-- procedure im_dynfield_attribute__del/1
+--
+CREATE OR REPLACE FUNCTION im_dynfield_attribute__del(
+   p_attribute_id integer
+) RETURNS integer AS $$
 DECLARE
-	p_attribute_id		alias for $1;
 
 	v_acs_attribute_id	integer;
 	v_acs_attribute_name	varchar;
@@ -1698,12 +1827,22 @@ BEGIN
 
 	PERFORM acs_attribute__drop_attribute(v_object_type, v_acs_attribute_name);
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
-create or replace function im_dynfield_attribute__name (integer) returns varchar as '
+
+
+-- added
+select define_function_args('im_dynfield_attribute__name','attribute_id');
+
+--
+-- procedure im_dynfield_attribute__name/1
+--
+CREATE OR REPLACE FUNCTION im_dynfield_attribute__name(
+   p_attribute_id integer
+) RETURNS varchar AS $$
 DECLARE
-	p_attribute_id		alias for $1;
 	v_name			varchar;
 	v_acs_attribute_id	integer;
 BEGIN
@@ -1719,16 +1858,25 @@ BEGIN
 	where	attribute_id = v_acs_attribute_id;
 
 	return v_name;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
 -- return a string coma separated with multimap values
-create or replace function im_dynfield_multimap_val_to_str (integer, integer, varchar) 
-returns varchar as '
+
+
+-- added
+select define_function_args('im_dynfield_multimap_val_to_str','attr_id,obj_id,widget_type');
+
+--
+-- procedure im_dynfield_multimap_val_to_str/3
+--
+CREATE OR REPLACE FUNCTION im_dynfield_multimap_val_to_str(
+   p_attr_id integer,
+   p_obj_id integer,
+   p_widget_type varchar
+) RETURNS varchar AS $$
 DECLARE
-	p_attr_id		alias for $1;
-	p_obj_id		alias for $2;
-	p_widget_type		alias for $3;
 
 	v_ret_string		varchar;
 	v_value			im_dynfield_attr_multi_value.value%TYPE;
@@ -1744,10 +1892,10 @@ BEGIN
 			AND value is not null
 	LOOP 
 		if v_ret_string is not null then 
-			v_ret_string := v_ret_string || '', '';
+			v_ret_string := v_ret_string || ', ';
 		end if; 
 	
-		if widget_type = ''category_tree'' then
+		if widget_type = 'category_tree' then
 			select category.name(row.v_value) into v_cat_name from dual;
 			v_ret_string := v_ret_string || v_cat_name;
 		else
@@ -1756,7 +1904,8 @@ BEGIN
 	END LOOP;
 		
 	return v_ret_string;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 
 
 -- ------------------------------------------------------------------
@@ -2263,7 +2412,8 @@ order by lower(project_name)
 
 
 -- Rich Text Field
-insert into acs_datatypes (datatype,max_n_values) values ('richtext',null);
+insert into acs_datatypes (datatype,max_n_values) select 'richtext',null where not exists (select 1 from acs_datatypes where datatype = 'richtext');
+
 SELECT im_dynfield_widget__new (
 	null,
 	'im_dynfield_widget',
@@ -2440,9 +2590,15 @@ SELECT im_dynfield_attribute_new ('im_office','address_country_code','Country', 
 -- DynField Fields
 --
 
-create or replace function inline_0 ()
-returns integer as '
-declare
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS integer AS $$
+DECLARE
 	v_attrib_name		varchar;	
 	v_attrib_pretty		varchar;
 	v_object_name		varchar;
@@ -2450,11 +2606,11 @@ declare
 	v_acs_attrib_id		integer;	
 	v_attrib_id		integer;
 	v_count			integer;
-begin
-	v_attrib_name := ''default_vat'';
-	v_attrib_pretty := ''Default VAT'';
-	v_object_name = ''im_company'';
-	v_table_name = ''im_companies'';
+BEGIN
+	v_attrib_name := 'default_vat';
+	v_attrib_pretty := 'Default VAT';
+	v_object_name = 'im_company';
+	v_table_name = 'im_companies';
 
 	select count(*) into v_count
 	from acs_attributes
@@ -2464,35 +2620,42 @@ begin
 	v_acs_attrib_id := acs_attribute__create_attribute (
 		v_object_name,
 		v_attrib_name,
-		''integer'',
+		'integer',
 		v_attrib_pretty,
 		v_attrib_pretty,
 		v_table_name,
-		NULL, NULL, ''0'', ''1'',
+		NULL, NULL, '0', '1',
 		NULL, NULL, NULL
 	);
 	v_attrib_id := acs_object__new (
 		null,
-		''im_dynfield_attribute'',
+		'im_dynfield_attribute',
 		now(),
 		null, null, null
 	);
 	insert into im_dynfield_attributes (
 		attribute_id, acs_attribute_id, widget_name, deprecated_p
 	) values (
-		v_attrib_id, v_acs_attrib_id, ''textbox_small'', ''f''
+		v_attrib_id, v_acs_attrib_id, 'textbox_small', 'f'
 	);
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 select inline_0 ();
 drop function inline_0 ();
 
 
 
 
-create or replace function inline_0 ()
-returns integer as '
-declare
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS integer AS $$
+DECLARE
 	v_attrib_name		varchar;	v_attrib_pretty	varchar;
 	v_object_name		varchar;	v_table_name		varchar;
 	v_widget_name		varchar;	v_data_type		varchar;
@@ -2500,13 +2663,13 @@ declare
 	v_acs_attrib_id	integer;	
 	v_attrib_id		integer;
 	v_count		integer;
-begin
-	v_attrib_name := ''default_invoice_template_id'';
-	v_attrib_pretty := ''Default Invoice Template'';
-	v_object_name = ''im_company'';
-	v_table_name = ''im_companies'';
-	v_data_type = ''integer'';
-	v_widget_name = ''category_invoice_template'';
+BEGIN
+	v_attrib_name := 'default_invoice_template_id';
+	v_attrib_pretty := 'Default Invoice Template';
+	v_object_name = 'im_company';
+	v_table_name = 'im_companies';
+	v_data_type = 'integer';
+	v_widget_name = 'category_invoice_template';
 
 	select count(*) into v_count
 	from acs_attributes
@@ -2520,22 +2683,23 @@ begin
 		v_attrib_pretty,
 		v_attrib_pretty,
 		v_table_name,
-		NULL, NULL, ''0'', ''1'',
+		NULL, NULL, '0', '1',
 		NULL, NULL, NULL
 	);
 	v_attrib_id := acs_object__new (
 		null,
-		''im_dynfield_attribute'',
+		'im_dynfield_attribute',
 		now(),
 		null, null, null
 	);
 	insert into im_dynfield_attributes (
 		attribute_id, acs_attribute_id, widget_name, deprecated_p
 	) values (
-		v_attrib_id, v_acs_attrib_id, v_widget_name, ''f''
+		v_attrib_id, v_acs_attrib_id, v_widget_name, 'f'
 	);
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 select inline_0 ();
 drop function inline_0 ();
 
@@ -2543,9 +2707,15 @@ drop function inline_0 ();
 
 
 
-create or replace function inline_0 ()
-returns integer as '
-declare
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS integer AS $$
+DECLARE
 	v_attrib_name		varchar;	v_attrib_pretty		varchar;
 	v_object_name		varchar;	v_table_name		varchar;
 	v_widget_name		varchar;	v_data_type		varchar;
@@ -2553,13 +2723,13 @@ declare
 	v_acs_attrib_id		integer;	
 	v_attrib_id		integer;
 	v_count			integer;
-begin
-	v_attrib_name := ''default_payment_method_id'';
-	v_attrib_pretty := ''Default Payment Method'';
-	v_object_name = ''im_company'';
-	v_table_name = ''im_companies'';
-	v_data_type = ''integer'';
-	v_widget_name = ''category_payment_method'';
+BEGIN
+	v_attrib_name := 'default_payment_method_id';
+	v_attrib_pretty := 'Default Payment Method';
+	v_object_name = 'im_company';
+	v_table_name = 'im_companies';
+	v_data_type = 'integer';
+	v_widget_name = 'category_payment_method';
 
 	select count(*) into v_count
 	from acs_attributes
@@ -2573,30 +2743,37 @@ begin
 		v_attrib_pretty,
 		v_attrib_pretty,
 		v_table_name,
-		NULL, NULL, ''0'', ''1'',
+		NULL, NULL, '0', '1',
 		NULL, NULL, NULL
 	);
 	v_attrib_id := acs_object__new (
 		null,
-		''im_dynfield_attribute'',
+		'im_dynfield_attribute',
 		now(),
 		null, null, null
 	);
 	insert into im_dynfield_attributes (
 		attribute_id, acs_attribute_id, widget_name, deprecated_p
 	) values (
-		v_attrib_id, v_acs_attrib_id, v_widget_name, ''f''
+		v_attrib_id, v_acs_attrib_id, v_widget_name, 'f'
 	);
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 select inline_0 ();
 drop function inline_0 ();
 
 
 
-create or replace function inline_0 ()
-returns integer as '
-declare
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS integer AS $$
+DECLARE
 	v_attrib_name	varchar;	v_attrib_pretty		varchar;
 	v_object_name	varchar;	v_table_name		varchar;
 	v_widget_name	varchar;	v_data_type		varchar;
@@ -2604,13 +2781,13 @@ declare
 	v_acs_attrib_id	integer;
 	v_attrib_id	integer;
 	v_count		integer;
-begin
-	v_attrib_name := ''default_payment_days'';
-	v_attrib_pretty := ''Default Payment Days'';
-	v_object_name = ''im_company'';
-	v_table_name = ''im_companies'';
-	v_data_type = ''integer'';
-	v_widget_name = ''textbox_small'';
+BEGIN
+	v_attrib_name := 'default_payment_days';
+	v_attrib_pretty := 'Default Payment Days';
+	v_object_name = 'im_company';
+	v_table_name = 'im_companies';
+	v_data_type = 'integer';
+	v_widget_name = 'textbox_small';
 
 	select count(*) into v_count
 	from acs_attributes
@@ -2624,30 +2801,37 @@ begin
 		v_attrib_pretty,
 		v_attrib_pretty,
 		v_table_name,
-		NULL, NULL, ''0'', ''1'',
+		NULL, NULL, '0', '1',
 		NULL, NULL, NULL
 	);
 	v_attrib_id := acs_object__new (
 		null,
-		''im_dynfield_attribute'',
+		'im_dynfield_attribute',
 		now(),
 		null, null, null
 	);
 	insert into im_dynfield_attributes (
 		attribute_id, acs_attribute_id, widget_name, deprecated_p
 	) values (
-		v_attrib_id, v_acs_attrib_id, v_widget_name, ''f''
+		v_attrib_id, v_acs_attrib_id, v_widget_name, 'f'
 	);
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 select inline_0 ();
 drop function inline_0 ();
 
 
 
-create or replace function inline_0 ()
-returns integer as '
-declare
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS integer AS $$
+DECLARE
 	v_attrib_name	varchar;	v_attrib_pretty	varchar;
 	v_object_name	varchar;	v_table_name	varchar;
 	v_widget_name	varchar;	v_data_type	varchar;
@@ -2655,13 +2839,13 @@ declare
 	v_acs_attrib_id	integer;
 	v_attrib_id	integer;
 	v_count		integer;
-begin
-	v_attrib_name := ''default_bill_template_id'';
-	v_attrib_pretty := ''Default Bill Template'';
-	v_object_name = ''im_company'';
-	v_table_name = ''im_companies'';
-	v_data_type = ''integer'';
-	v_widget_name = ''category_invoice_template'';
+BEGIN
+	v_attrib_name := 'default_bill_template_id';
+	v_attrib_pretty := 'Default Bill Template';
+	v_object_name = 'im_company';
+	v_table_name = 'im_companies';
+	v_data_type = 'integer';
+	v_widget_name = 'category_invoice_template';
 
 	select count(*) into v_count
 	from acs_attributes
@@ -2675,30 +2859,37 @@ begin
 		v_attrib_pretty,
 		v_attrib_pretty,
 		v_table_name,
-		NULL, NULL, ''0'', ''1'',
+		NULL, NULL, '0', '1',
 		NULL, NULL, NULL
 	);
 	v_attrib_id := acs_object__new (
 		null,
-		''im_dynfield_attribute'',
+		'im_dynfield_attribute',
 		now(),
 		null, null, null
 	);
 	insert into im_dynfield_attributes (
 		attribute_id, acs_attribute_id, widget_name, deprecated_p
 	) values (
-		v_attrib_id, v_acs_attrib_id, v_widget_name, ''f''
+		v_attrib_id, v_acs_attrib_id, v_widget_name, 'f'
 	);
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 select inline_0 ();
 drop function inline_0 ();
 
 
 
-create or replace function inline_0 ()
-returns integer as '
-declare
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS integer AS $$
+DECLARE
 	v_attrib_name	varchar;	v_attrib_pretty	varchar;
 	v_object_name	varchar;	v_table_name	varchar;
 	v_widget_name	varchar;	v_data_type	varchar;
@@ -2706,13 +2897,13 @@ declare
 	v_acs_attrib_id	integer;
 	v_attrib_id	integer;
 	v_count		integer;
-begin
-	v_attrib_name := ''default_po_template_id'';
-	v_attrib_pretty := ''Default Purchase Order Template'';
-	v_object_name = ''im_company'';
-	v_table_name = ''im_companies'';
-	v_data_type = ''integer'';
-	v_widget_name = ''category_invoice_template'';
+BEGIN
+	v_attrib_name := 'default_po_template_id';
+	v_attrib_pretty := 'Default Purchase Order Template';
+	v_object_name = 'im_company';
+	v_table_name = 'im_companies';
+	v_data_type = 'integer';
+	v_widget_name = 'category_invoice_template';
 
 	select count(*) into v_count
 	from acs_attributes
@@ -2726,27 +2917,34 @@ begin
 		v_attrib_pretty,
 		v_attrib_pretty,
 		v_table_name,
-		NULL, NULL, ''0'', ''1'',
+		NULL, NULL, '0', '1',
 		NULL, NULL, NULL
 	);
 	v_attrib_id := acs_object__new (
 		null,
-		''im_dynfield_attribute'',
+		'im_dynfield_attribute',
 		now(),
 		null, null, null
 	);
 	insert into im_dynfield_attributes (attribute_id, acs_attribute_id, widget_name, deprecated_p
-	) values (v_attrib_id, v_acs_attrib_id, v_widget_name, ''f'');
+	) values (v_attrib_id, v_acs_attrib_id, v_widget_name, 'f');
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 select inline_0 ();
 drop function inline_0 ();
 
 
 
-create or replace function inline_0 ()
-returns integer as '
-declare
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS integer AS $$
+DECLARE
 	v_attrib_name	varchar;	v_attrib_pretty	varchar;
 	v_object_name	varchar;	v_table_name	varchar;
 	v_widget_name	varchar;	v_data_type	varchar;
@@ -2754,13 +2952,13 @@ declare
 	v_acs_attrib_id	integer;
 	v_attrib_id	integer;
 	v_count		integer;
-begin
-	v_attrib_name := ''default_delnote_template_id'';
-	v_attrib_pretty := ''Default Delivery Note Template'';
-	v_object_name = ''im_company'';
-	v_table_name = ''im_companies'';
-	v_data_type = ''integer'';
-	v_widget_name = ''category_invoice_template'';
+BEGIN
+	v_attrib_name := 'default_delnote_template_id';
+	v_attrib_pretty := 'Default Delivery Note Template';
+	v_object_name = 'im_company';
+	v_table_name = 'im_companies';
+	v_data_type = 'integer';
+	v_widget_name = 'category_invoice_template';
 
 	select count(*) into v_count
 	from acs_attributes
@@ -2774,27 +2972,34 @@ begin
 		v_attrib_pretty,
 		v_attrib_pretty,
 		v_table_name,
-		NULL, NULL, ''0'', ''1'',
+		NULL, NULL, '0', '1',
 		NULL, NULL, NULL
 	);
 	v_attrib_id := acs_object__new (
 		null,
-		''im_dynfield_attribute'',
+		'im_dynfield_attribute',
 		now(),
 		null, null, null
 	);
 	insert into im_dynfield_attributes (attribute_id, acs_attribute_id, widget_name, deprecated_p
-	) values (v_attrib_id, v_acs_attrib_id, v_widget_name, ''f'');
+	) values (v_attrib_id, v_acs_attrib_id, v_widget_name, 'f');
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 select inline_0 ();
 drop function inline_0 ();
 
 
 
-create or replace function inline_0 ()
-returns integer as '
-declare
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS integer AS $$
+DECLARE
 	v_attrib_name		varchar;
 	v_attrib_pretty		varchar;
 	v_table			varchar;
@@ -2803,25 +3008,25 @@ declare
 	v_acs_attrib_id		integer;
 	v_attrib_id		integer;
 	v_count			integer;
-begin
-	v_attrib_name := ''company_project_nr'';
-	v_attrib_pretty := ''Customer Project Nr'';
-	v_object := ''im_project'';
-	v_table := ''im_projects'';
+BEGIN
+	v_attrib_name := 'company_project_nr';
+	v_attrib_pretty := 'Customer Project Nr';
+	v_object := 'im_project';
+	v_table := 'im_projects';
 
 	select count(*) into v_count from acs_attributes
 	where attribute_name = v_attrib_name;
 	IF 0 != v_count THEN return 0; END IF;
 
 	select count(*) into v_count from acs_object_type_tables
-	where object_type = ''im_project'' and table_name = ''im_projects'';
+	where object_type = 'im_project' and table_name = 'im_projects';
 	IF v_count = 0 THEN
 		insert into acs_object_type_tables (object_type, table_name, id_column)
-		values (''im_project'', ''im_projects'', ''project_id'');
+		values ('im_project', 'im_projects', 'project_id');
 	END IF;
 
 	select	count(*) into v_count from user_tab_columns
-	where lower(table_name) = ''im_projects'' and lower(column_name) = ''company_project_nr'';
+	where lower(table_name) = 'im_projects' and lower(column_name) = 'company_project_nr';
 	IF v_count = 0 THEN
 		alter table im_projects add company_project_nr varchar(50);
 	END IF;
@@ -2829,28 +3034,94 @@ begin
 	v_acs_attrib_id := acs_attribute__create_attribute (
 		v_object,
 		v_attrib_name,
-		''string'',
+		'string',
 		v_attrib_pretty,
 		v_attrib_pretty,
 		v_table,
-		NULL, NULL, ''0'', ''1'',
+		NULL, NULL, '0', '1',
 		NULL, NULL, NULL
 	);
 	v_attrib_id := acs_object__new (
 		null,
-		''im_dynfield_attribute'',
+		'im_dynfield_attribute',
 		now(),
 		null, null, null
 	);
 	insert into im_dynfield_attributes (
 		attribute_id, acs_attribute_id, widget_name, deprecated_p
 	) values (
-		v_attrib_id, v_acs_attrib_id, ''textbox_medium'', ''f''
+		v_attrib_id, v_acs_attrib_id, 'textbox_medium', 'f'
 	);
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 select inline_0 ();
 drop function inline_0 ();
+
+
+
+
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS integer AS $$
+DECLARE
+	v_attrib_name		varchar;
+	v_attrib_pretty		varchar;
+	v_table			varchar;
+	v_object		varchar;
+
+	v_acs_attrib_id		integer;
+	v_attrib_id		integer;
+	v_count			integer;
+BEGIN
+	v_attrib_name := 'final_company';
+	v_attrib_pretty := 'Final Customer';
+	v_object := 'im_project';
+	v_table := 'im_projects';
+
+	select count(*) into v_count from acs_attributes
+	where attribute_name = v_attrib_name;
+	IF 0 != v_count THEN return 0; END IF;
+
+	select count(*) into v_count from user_tab_columns
+	where lower(table_name) = 'im_projects' and lower(column_name) = 'final_company';
+	IF v_count = 0 THEN
+		alter table im_projects add final_company varchar(200);
+	END IF;
+
+	v_acs_attrib_id := acs_attribute__create_attribute (
+		v_object,
+		v_attrib_name,
+		'string',
+		v_attrib_pretty,
+		v_attrib_pretty,
+		v_table,
+		NULL, NULL, '0', '1',
+		NULL, NULL, NULL
+	);
+	v_attrib_id := acs_object__new (
+		null,
+		'im_dynfield_attribute',
+		now(),
+		null, null, null
+	);
+	insert into im_dynfield_attributes (
+		attribute_id, acs_attribute_id, widget_name, deprecated_p
+	) values (
+		v_attrib_id, v_acs_attrib_id, 'textbox_medium', 'f'
+	);
+	return 0;
+END;
+$$ LANGUAGE plpgsql;
+select inline_0 ();
+drop function inline_0 ();
+
+
 
 
 
@@ -2863,8 +3134,14 @@ drop function inline_0 ();
 
 
 -- return a string coma separated with multimap values
-create or replace function inline_0()
-returns varchar as '
+
+
+--
+-- procedure inline_0/0
+--
+CREATE OR REPLACE FUNCTION inline_0(
+
+) RETURNS varchar AS $$
 DECLARE
 	row			RECORD;
 BEGIN
@@ -2881,10 +3158,10 @@ BEGIN
 			pgc.relname = aa.table_name and 
 			pga.attname = attribute_name and
 			pga.attrelid = pgc.oid and 
-			pga.attnotnull = ''t''
+			pga.attnotnull = 't'
 	LOOP
 		update im_dynfield_type_attribute_map 
-			set required_p = ''t'' 
+			set required_p = 't' 
 		where attribute_id = row.attribute_id;
 		
 		update acs_attributes 
@@ -2898,7 +3175,8 @@ BEGIN
 	END LOOP;
 		
 	return 0;
-end;' language 'plpgsql';
+END;
+$$ LANGUAGE plpgsql;
 select inline_0();
 drop function inline_0();
 
@@ -2910,39 +3188,3 @@ SET parameters = '{format "YYYY-MM-DD"} {after_html {<input type="button" style=
 WHERE widget_name = 'date';
 
 
-SELECT acs_log__debug('/packages/intranet-dynfield/sql/postgresql/upgrade/upgrade-4.0.0.0.0-4.0.1.0.0.sql','');
-
-comment on table im_dynfield_attributes is 'Contains additional information for an acs_attribute like the widget to be used. The other attributes are mainly for backwards compatibility. Note that dynfield_attributes are acs_objects in contrast to acs_attributes which are NOT acs_objects (see acs_attributes for this)';
-
-comment on column im_dynfield_attributes.attribute_id is 'This column should be called dynfield_id. It is the internal dynfield_id (an object_id) is referenced by the other tables in dynfields to provide the connection between the acs_attribute_id and the display logic of the dynfield';
-
-comment on column im_dynfield_attributes.acs_attribute_id is 'This references the attribute_id from acs_attributes. It is used to connect an acs_attribute with the display_logic';
-
-comment on table im_dynfield_layout is 'This table is used for providing positioning (layout) information of an attribute when being displayed.';
-comment on column im_dynfield_layout.attribute_id is 'This is the dynfield_id which references im_dynfield_attributes.';
-comment on column im_dynfield_layout.page_url is 'The page_url is the identified which groups the attributes together on a single page. The idea is that you can have a different layout of the attributes depending e.g. if you display the form (which would be displayed like a normal ad_form, where you just need the pos_y to define the order of attributes) and a page to display the attribute values, which could be a table with two columns where you would define which attribute will be displayed on what column in the table (using pos_y). The ''default'' page_url is the standard being used when no other page_url is specified.';
-comment on column im_dynfield_layout.pos_x is 'pos_x defines in which column in a table layout you will find the attribute rendered.';
-comment on column im_dynfield_layout.pos_y is 'pos_y could also be labelled ''sort_order'', but defines the row coordinate in a table layout where the attribute is rendered. By default im_dynfields supports only one_column which is why the entry form at attribute-new.tcl provides a possibility to enter pos_y for sorting';
-comment on column im_dynfield_layout.label_style is ' the style in which the label (attribute_name) is presented in conjunction with the attribute''s value / form_widget. Default is ''table'' which means the label is in column 1 and the value / form_widget is in column 2. Most pages in ]project-open[ don''t bother looking at im_dynfield_layout and just use a normal ''table'' layout. This is changing with the advent of ExtJS driven Forms.';
-comment on column im_dynfield_layout.div_class is 'This is the class information which you can pass onto the renderer to override the the standard CSS for this widget. Not in use in any ]project-open[ application as of beginning of 2011';
-comment on column im_dynfield_layout.sort_key is 'This is the sorting key for attributes which have a multiple choice widget like combo_box (select) or radio/ checkboxes. This allows you to differentiate if you would like to sort by value or by name. Not in use, all applications default to sort by name as of 2011';
-
-
-alter table im_dynfield_type_attribute_map drop constraint im_dynfield_type_attr_map_attr_fk;
-delete from im_dynfield_type_attribute_map where attribute_id not in (select attribute_id from im_dynfield_attributes);
-alter table im_dynfield_type_attribute_map add constraint im_dynfield_type_attr_map_attr_fk foreign key (attribute_id) references im_dynfield_attributes(attribute_id) on delete cascade;
-
-comment on table im_dynfield_type_attribute_map is 'This table defines under which conditions an attribute is to be rendered. The condition is determined by the object_type_id, which is a category_id. This category_id is of the category_type which is defined as ''type_category_type'' for the object_type of the attribute. The object_type ''im_projects'' has a type_category_type in acs_object_types of ''Intranet Project Type'' which is the category_type (in im_categories) that contains all the category_ids which can be used to define conditions in the way of object_type_id.';
-comment on column im_dynfield_type_attribute_map.attribute_id is 'This is the dynfield_id from im_dynfield_attributes which identifies the attribute. It is NOT an attribute_id from acs_attributes.';
-comment on column im_dynfield_type_attribute_map.object_type_id is 'This is the conditions identifier. This identifier is object specific, so if we take Projects as an example again, the condition is defined by the object''s type_id. In the case of Projects, this is stored in im_projects.project_type_id (see acs_object_types.type_column for more). When an object (e.g. Project) is displayed, the system takes the project_type_id and looks up in type_attribute_map how the attributes for the object_type ''im_project'' are to be treated.';
-comment on column im_dynfield_type_attribute_map.display_mode is 'The display mode defining the mode in which the attribute is to be displayed. ''edit'' means, it can be both displayed (attribute & value) and edited in a form. ''display'' means that it will displayed when showing the object, but it will not be included in a form. ''none'' means it will neither show up when displaying the object nor when editing a form for this object. This is in addition to the individual permissions you can give on the dynfield_id, so if Freelancers don''t have permission to view attribute, then it does not matter what the display_mode says, they won''t see it';
-comment on column im_dynfield_type_attribute_map.help_text is 'This is the help_text for this attribute. Though usually it is the same for all object_type_ids (and this is how it is saved with im_dynfield::attribute::add) it is possible to make it differ depending on the TYPE (category_id) of the object';
-comment on column im_dynfield_type_attribute_map.section_heading is 'This allows the grouping of attributes under a common heading. See ad_form sections for more details.';
-comment on column im_dynfield_type_attribute_map.default_value is 'This is the default value for this attribute. Though usually it is the same for all object_type_ids (and this is how it is saved with im_dynfield::attribute::add) it is possible to make it differ depending on the TYPE (category_id) of the object';
-comment on column im_dynfield_type_attribute_map.required_p is 'This marks, if the attribute is a required attribute in this condition. This is useful e.g. in Projects where depending on the project_type you want an attribute to be filled out, but for other project types it is not necessary.';
-
-comment on column acs_object_types.status_column is 'Defines the column in the status_type_table which stores the category_id for the STATUS of an object of this object_type.';
-comment on column acs_object_types.type_column is 'Defines the column in the status_type_table which stores the category_id for the TYPE of an object of this object_type.';
-comment on column acs_object_types.status_type_table is 'Defines the table which stores the STATUS and TYPE of the object_type. Defaults to the table_namee of the object_type';
-comment on column acs_object_types.type_category_type is 'Defines the category_type from im_categories which contains the options for the TYPE of the object';
-comment on column acs_object_types.object_type_gif is 'Image for the object_type';

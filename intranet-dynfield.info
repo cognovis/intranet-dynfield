@@ -17,6 +17,7 @@
 
         <provides url="intranet-dynfield" version="4.0.3.1.0"/>
         <requires url="intranet-core" version="4.0.1.0.0"/>
+	<requires url="acs-workflow" version="4.5.5d1"/>
 
         <callbacks>
 	    <callback type="after-install"  proc="im_dynfield::package_install"/>
