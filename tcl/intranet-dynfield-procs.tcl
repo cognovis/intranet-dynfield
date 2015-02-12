@@ -607,7 +607,8 @@ ad_proc -public im_dynfield::attribute_store {
        select	m.attribute_id,
                 m.object_type_id as ot,
                 m.display_mode as dm,
-		m.help_text as ht
+    		        m.help_text as ht,
+    		        m.help_url as hu
         from	im_dynfield_type_attribute_map m,
                 im_dynfield_attributes a,
                 acs_attributes aa
@@ -617,8 +618,8 @@ ad_proc -public im_dynfield::attribute_store {
     "
 
     db_foreach attribute_table_map $sql {
-	set key "$attribute_id.$ot"
-	set display_mode_hash($key) [string tolower $dm]
+        	set key "$attribute_id.$ot"
+        	set display_mode_hash($key) [string tolower $dm]
     }
 
     # -------------------------------------------------
@@ -1063,6 +1064,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
                 m.object_type_id as ot,
                 m.display_mode as dm,
 		        m.help_text as ht,
+		        m.help_url as hu,
                 m.default_value as dv
         from
                 im_dynfield_type_attribute_map m,
@@ -1083,6 +1085,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
         set key "$attribute_id.$ot"
         set display_mode_hash($key) $dm
         set help_text($attribute_id) $ht
+        set help_url($attribute_id) $hu
         set default_value($attribute_id) $dv
 
         # Now we've got atleast one display mode configured:
@@ -1286,6 +1289,13 @@ ad_proc -public im_dynfield::append_attributes_to_form {
         } else {
             set help_message ""
         }
+        
+        if {[info exists help_url($dynfield_attribute_id)]} {
+            set help_message_url $help_url($dynfield_attribute_id)
+        } else {
+            set help_message_url ""
+        }
+
 
         # Default Values
         if {[info exists default_value($dynfield_attribute_id)]} {
@@ -1307,6 +1317,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
             -required_p $required_p \
             -pretty_name $pretty_name \
             -help_text $help_message \
+            -help_url $help_message_url \
             -default_value $default_message \
             -admin_html $admin_html
         
@@ -1447,6 +1458,7 @@ ad_proc -public im_dynfield::append_attribute_to_form {
     -attribute_name:required
     -pretty_name:required
     -help_text:required
+    -help_url:required
     -default_value:required
     {-admin_html "" }
     {-debug 0}
@@ -1505,8 +1517,17 @@ ad_proc -public im_dynfield::append_attribute_to_form {
     set pretty_name [lang::message::lookup "" $pretty_name_key $pretty_name]
 
     # Show help text as part of a help GIF
-    if {$help_text ne ""} {
-        set after_html [im_gif help [lang::util::localize $help_text]]
+    if {$help_text ne "" || $help_url ne ""} {
+        if {$help_url eq ""} {
+            set after_html [im_gif help [lang::util::localize $help_text]]            
+        } else {
+            if {$help_text ne ""} {
+                set after_html "<a href='$help_url' target='_help'>[im_gif help "[lang::util::localize $help_text] - [lang::util::localize "Click on the icon go find out more."]"]<a>"
+            } else {
+                set after_html "<a href='$help_url' target='_help'>[im_gif help "[lang::util::localize "Click on the icon go find out more."]"]<a>"
+            }
+        }
+
     } else {
         set after_html ""
     }

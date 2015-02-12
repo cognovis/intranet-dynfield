@@ -101,6 +101,7 @@ ad_proc -public im_dynfield::attribute::add {
     {-label_style "plain"}
     {-pos_y "0"}
     {-help_text ""} 
+    {-help_url ""} 
     {-section_heading ""}
     {-default_value ""}
 } {
@@ -122,6 +123,7 @@ ad_proc -public im_dynfield::attribute::add {
     @param also_hard_coded_p Does this field also exist hard coded in the PO-screens? Set this field if it should not appear in PO screens
     @param pos_y Give a value for the Y-position, ranging from '0' (top) to '100' (bottom). Currently, DynFields are appended at the end of any form in the order given by this variable. 
     @param help_text Help Text for this attribute in the widget
+    @param help_url Help URL with more information for this attribute in the widget
     @param section_heading Section Heading for  the attribute in the default_list
     @param default_value Default value which will be used for the attribute
 } {        
@@ -225,6 +227,7 @@ ad_proc -public im_dynfield::attribute::add {
     db_dml update_texts "
         update im_dynfield_type_attribute_map set
             help_text = :help_text,
+            help_url = :help_url,
             section_heading = :section_heading,
             default_value = :default_value
         where attribute_id = :attribute_id

@@ -67,10 +67,11 @@ if {[exists_and_not_null attribute_id]} {
     "
 
 	if {![db_0or1row attribute_texts "
-		select section_heading, help_text,default_value from im_dynfield_type_attribute_map where attribute_id = :attribute_id limit 1
+		select section_heading, help_text, help_url,default_value from im_dynfield_type_attribute_map where attribute_id = :attribute_id limit 1
 	"]} {
 		set section_heading ""
 		set help_text ""
+		set help_url ""
 	}
     set element_mode "view"
 } else {
@@ -311,6 +312,15 @@ lappend form_fields {
 }
 
 lappend form_fields {
+    help_url:text,optional 
+    {label {Help URL}} 
+    {html {size 60 maxlength 200}}
+    {help_text "
+        URL with more help information
+    "}
+}
+
+lappend form_fields {
 	default_value:text,optional 
 	{label {Default Value}} 
 	{html {size 60 maxlength 200}}
@@ -402,6 +412,7 @@ ad_form \
 			  -label_style $label_style \
 			  -pos_y $pos_y \
 			  -help_text $help_text \
+              -help_url $help_url \
 			  -default_value $default_value \
 			  -section_heading $section_heading \
 			 ]
@@ -477,6 +488,7 @@ ad_form \
 	db_dml update_texts "
         update im_dynfield_type_attribute_map set
             help_text = :help_text,
+            help_url = :help_url,
             default_value = :default_value,
             section_heading = :section_heading,
 	    required_p = :required_p
@@ -490,9 +502,9 @@ ad_form \
               and category_type = type_category_type"]
 	foreach category_id $category_ids {
 	    db_dml insert "insert into im_dynfield_type_attribute_map (
-                               attribute_id, object_type_id, display_mode, help_text, default_value, section_heading, required_p
+                               attribute_id, object_type_id, display_mode, help_text, help_url, default_value, section_heading, required_p
                            ) values (
-                               :attribute_id, :category_id, 'edit', :help_text, :default_value, :section_heading, :required_p
+                               :attribute_id, :category_id, 'edit', :help_text, :help_url, :default_value, :section_heading, :required_p
                            )"
 	}
     }
