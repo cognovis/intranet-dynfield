@@ -136,6 +136,7 @@ set left_scale [db_list left_dim "
                 aa.sort_order, aa.pretty_name
 "]
 
+
 # The array maps category_id into "attribute_id category" - a pretty
 # string for each column, to be used as column header
 db_foreach left_scale_map "

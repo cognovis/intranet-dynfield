@@ -1065,6 +1065,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
                 m.display_mode as dm,
 		        m.help_text as ht,
 		        m.help_url as hu,
+		m.section_heading as sh
                 m.default_value as dv
         from
                 im_dynfield_type_attribute_map m,
@@ -1086,6 +1087,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
         set display_mode_hash($key) $dm
         set help_text($attribute_id) $ht
         set help_url($attribute_id) $hu
+	set section_heading($attribute_id) $sh
         set default_value($attribute_id) $dv
 
         # Now we've got atleast one display mode configured:
@@ -1192,9 +1194,15 @@ ad_proc -public im_dynfield::append_attributes_to_form {
 
 
     set field_cnt 0
+
+    if {$debug} { ns_log Notice "im_dynfield::append_attributes_to_form: Now looping through attributes and evaluate show mode" }
+
     db_foreach attributes $attributes_sql {
 	# Check if the elements as disabled in the layout page
-	if {$page_url_exists_p && "" == $page_url} { continue }
+	if {$page_url_exists_p && "" == $page_url} { 
+	    if {$debug} { ns_log Notice "im_dynfield::append_attributes_to_form: Skipping - no page URL found" }
+	    continue 
+	}
 
 	# Check if the current user has the right to read and write on the dynfield
 	set read_p [im_object_permission \
@@ -1227,7 +1235,6 @@ ad_proc -public im_dynfield::append_attributes_to_form {
 #	    if {!$write_p} { set read_p 1 }
 	}
 
-
 	# object_subtype_id can be a list, so go through the list
 	# and take the highest one (none - display - edit).
 	foreach subtype_id $object_subtype_id {
@@ -1251,7 +1258,10 @@ ad_proc -public im_dynfield::append_attributes_to_form {
         
         if {$debug} { ns_log Debug "append_attributes_to_form3: name=$attribute_name, display_mode=$display_mode" }
         
-        if {"none" == $display_mode} { continue }
+	if {"none" == $display_mode} { 
+	    if {$debug} { ns_log Notice "im_dynfield::append_attributes_to_form: Skipping, display_mode = 'none'" }
+	    continue 
+	}
         
         # Don't show a read-only mode in an "edit" form
         # Doesn't work yet, because the field is expected later
@@ -1280,7 +1290,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
         if {$admin_p} {
             set admin_help ""
             set dynfield_admin_url [export_vars -base "/intranet-dynfield/attribute-new" {{attribute_id $dynfield_attribute_id} return_url}]
-            set admin_html "<a href='$dynfield_admin_url'>[im_gif wrench $admin_help]</a>"
+	    set admin_html "<a href='$dynfield_admin_url'>[im_gif -translate_p 0 wrench $admin_help]</a>"
         }
         
         # Help
@@ -1296,6 +1306,11 @@ ad_proc -public im_dynfield::append_attributes_to_form {
             set help_message_url ""
         }
 
+        if {[info exists section_heading($dynfield_attribute_id)]} {
+            set section_head $section_heading($dynfield_attribute_id)
+        } else {
+            set section_head ""
+        }
 
         # Default Values
         if {[info exists default_value($dynfield_attribute_id)]} {
@@ -1318,6 +1333,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
             -pretty_name $pretty_name \
             -help_text $help_message \
             -help_url $help_message_url \
+	    -section_heading $section_head \
             -default_value $default_message \
             -admin_html $admin_html
         
@@ -1459,6 +1475,7 @@ ad_proc -public im_dynfield::append_attribute_to_form {
     -pretty_name:required
     -help_text:required
     -help_url:required
+    -section_heading:required
     -default_value:required
     {-admin_html "" }
     {-debug 0}
@@ -1533,6 +1550,11 @@ ad_proc -public im_dynfield::append_attribute_to_form {
     }
 
     append after_html $admin_html
+    if {$debug} { ns_log Notice "im_dynfield::append_attribute_to_form: form_id=$form_id, attribute_name=$attribute_name, widget=$widget" }
+
+    if {"" != $section_heading} {
+	template::form::section -legendtext $section_heading $form_id $section_heading
+    }
 
 
     # Deal with global variables being pushed through
