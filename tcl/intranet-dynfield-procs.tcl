@@ -1065,7 +1065,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
                 m.display_mode as dm,
 		        m.help_text as ht,
 		        m.help_url as hu,
-		m.section_heading as sh
+            		m.section_heading as sh,
                 m.default_value as dv
         from
                 im_dynfield_type_attribute_map m,
@@ -1087,7 +1087,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
         set display_mode_hash($key) $dm
         set help_text($attribute_id) $ht
         set help_url($attribute_id) $hu
-	set section_heading($attribute_id) $sh
+	    set section_heading($attribute_id) $sh
         set default_value($attribute_id) $dv
 
         # Now we've got atleast one display mode configured:
@@ -1333,7 +1333,7 @@ ad_proc -public im_dynfield::append_attributes_to_form {
             -pretty_name $pretty_name \
             -help_text $help_message \
             -help_url $help_message_url \
-	    -section_heading $section_head \
+	        -section_heading $section_head \
             -default_value $default_message \
             -admin_html $admin_html
         
@@ -1512,7 +1512,7 @@ ad_proc -public im_dynfield::append_attribute_to_form {
             set html_parameters [lindex $parameter_list [expr $html_pos + 1]]
         }
 
-	set format_pos [lsearch $parameter_list "format"]
+	    set format_pos [lsearch $parameter_list "format"]
         if {$format_pos >= 0} {
             set format_parameters [lindex $parameter_list [expr $format_pos + 1]]
         }
@@ -1522,10 +1522,10 @@ ad_proc -public im_dynfield::append_attribute_to_form {
             set after_html_parameters [subst [lindex $parameter_list [expr $after_html_pos + 1]]]
         }
 
-	set options_pos [lsearch $parameter_list "options"]
-	if {$options_pos >= 0} {
-	    set option_parameters [lindex $parameter_list [expr $options_pos + 1]]
-	}
+        	set options_pos [lsearch $parameter_list "options"]
+        	if {$options_pos >= 0} {
+        	    set option_parameters [lindex $parameter_list [expr $options_pos + 1]]
+        	}
     }
 
     # Localization - use the intranet-core L10n space for translation.
@@ -1553,19 +1553,19 @@ ad_proc -public im_dynfield::append_attribute_to_form {
     if {$debug} { ns_log Notice "im_dynfield::append_attribute_to_form: form_id=$form_id, attribute_name=$attribute_name, widget=$widget" }
 
     if {"" != $section_heading} {
-	template::form::section -legendtext $section_heading $form_id $section_heading
+        	template::form::section -legendtext $section_heading $form_id $section_heading
     }
 
 
     # Deal with global variables being pushed through
     set global_var_pos [lsearch $default_value global_var]
     if {$global_var_pos >= 0} {
-	set global_var_names [lindex $default_value [expr $global_var_pos +1]]
-	foreach global_var_name $global_var_names {
-	    # The global var is usually called from the procedure call 
-	    # add_attributes_to_form
-	    upvar 2 $global_var_name $global_var_name
-	}
+        	set global_var_names [lindex $default_value [expr $global_var_pos +1]]
+        	foreach global_var_name $global_var_names {
+        	    # The global var is usually called from the procedure call 
+        	    # add_attributes_to_form
+        	    upvar 2 $global_var_name $global_var_name
+        	}
     }
 
     # Check if we need to parse the default_value
@@ -1574,18 +1574,19 @@ ad_proc -public im_dynfield::append_attribute_to_form {
     # Deal with global variables being pushed through
     set tcl_pos [lsearch $default_value tcl]
     if {$tcl_pos >= 0} {
-	set tcl_code [lindex $default_value [expr $tcl_pos +1]]
+        	set tcl_code [lindex $default_value [expr $tcl_pos +1]]
         set default_value [eval $tcl_code]
     }
 
 
     switch $widget {
-        checkbox - radio - select - multiselect - im_category_tree - category_tree {
+        checkbox - radio - select - multiselect - im_category_tree - category_tree - generic_tcl - generic_sql {
 	    # These widgets need an additional -options parameter
             if { [string eq $required_p "f"] && ![string eq $widget "checkbox"]} {
                 set option_parameters [linsert $option_parameters -1 [list "" ""]]
             }
-
+    ds_comment "Widget :: $widget :: $pretty_name :: $display_mode"
+            
             if {![template::element::exists $form_id "$attribute_name"]} {
                 template::element create $form_id "$attribute_name" \
                     -datatype "text" [ad_decode $required_p "f" "-optional" ""] \
@@ -1597,7 +1598,7 @@ ad_proc -public im_dynfield::append_attribute_to_form {
                     -after_html "$after_html $after_html_parameters" \
                     -mode $display_mode \
                     -values $default_value \
-		    -value $default_value
+		            -value $default_value
             }
         }
 	date {
